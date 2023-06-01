@@ -87,7 +87,70 @@ class MainWindow(QMainWindow):
 
         widget = QWidget()
         widget.setLayout(self.vbox)
-        self.setCentralWidget(widget)
+
+        self.vbox2 = QVBoxLayout()
+        self.combo2 = QComboBox()
+        self.combo2.addItems(["2-compartment", "1-compartment"])
+        self.vbox2.addWidget(self.combo2)
+
+        self.hboxka = QHBoxLayout()
+        kA = QLabel("kA (absorption rate):")
+        self.kA_input = QLineEdit()
+        self.hboxka.addWidget(kA)
+        self.hboxka.addWidget(self.kA_input)
+
+        self.hboxkel = QHBoxLayout()
+        kel = QLabel("kEl (elimination rate):")
+        self.kel_input = QLineEdit()
+        self.hboxkel.addWidget(kel)
+        self.hboxkel.addWidget(self.kel_input)
+
+        self.hboxd = QHBoxLayout()
+        dose = QLabel("Dose (mg/kg):")
+        self.d_input = QLineEdit()
+        self.hboxd.addWidget(dose)
+        self.hboxd.addWidget(self.d_input)
+
+        self.hboxvd = QHBoxLayout()
+        vd = QLabel("Vol of dist Vd (L/kg):")
+        self.vd_input = QLineEdit()
+        self.hboxvd.addWidget(vd)
+        self.hboxvd.addWidget(self.vd_input)
+
+        self.hboxInt = QHBoxLayout()
+        interval = QLabel("Interval (days):")
+        self.int_input = QLineEdit()
+        self.hboxInt.addWidget(interval)
+        self.hboxInt.addWidget(self.int_input)
+
+        self.hboxnumd = QHBoxLayout()
+        num_d = QLabel("Num doses:")
+        self.numd_input = QLineEdit()
+        self.hboxnumd.addWidget(num_d)
+        self.hboxnumd.addWidget(self.numd_input)
+
+        # Set the central widget of the Window.
+        self.vbox2.addLayout(self.hboxka)
+        self.vbox2.addLayout(self.hboxkel)
+        self.vbox2.addLayout(self.hboxd)
+        self.vbox2.addLayout(self.hboxvd)
+        self.vbox2.addLayout(self.hboxInt)
+        self.vbox2.addLayout(self.hboxnumd)
+
+        calc_button2 = QPushButton("Calculate")
+        self.vbox2.addWidget(calc_button2)
+
+        export_button2 = QPushButton("Export to CSV")
+        self.vbox2.addWidget(export_button2)
+
+        widget2 = QWidget()
+        widget2.setLayout(self.vbox2)
+
+        tabwidget = QTabWidget()
+        tabwidget.addTab(widget, "Param Calculator")
+        tabwidget.addTab(widget2, "Multiple Dose Calculator")
+
+        self.setCentralWidget(tabwidget)
         self.setWindowTitle("Auritec PK Modeler")
 
     def on_change_comp(self):
