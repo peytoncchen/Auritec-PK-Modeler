@@ -4,6 +4,7 @@ import pandas as pd
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 import sys
+import numpy as np
 import matplotlib
 matplotlib.use('QtAgg')
 
@@ -129,6 +130,10 @@ class MainWindow(QMainWindow):
         self.hboxnumd.addWidget(num_d)
         self.hboxnumd.addWidget(self.numd_input)
 
+        self.combo3 = QComboBox()
+        self.combo3.addItems(["Linear Scale", "Log Scale"])
+        self.vbox2.addWidget(self.combo3)
+
         # Set the central widget of the Window.
         self.vbox2.addLayout(self.hboxka)
         self.vbox2.addLayout(self.hboxkel)
@@ -138,9 +143,11 @@ class MainWindow(QMainWindow):
         self.vbox2.addLayout(self.hboxnumd)
 
         calc_button2 = QPushButton("Calculate")
+        calc_button2.clicked.connect(self.calc_2)
         self.vbox2.addWidget(calc_button2)
 
         export_button2 = QPushButton("Export to CSV")
+        export_button.clicked.connect(self.exportcsv2)
         self.vbox2.addWidget(export_button2)
 
         widget2 = QWidget()
@@ -152,6 +159,59 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(tabwidget)
         self.setWindowTitle("Auritec PK Modeler")
+
+    def calc_2(self):
+        ka = float(self.kA_input.text())
+        kel = float(self.kel_input.text())
+        dose = float(self.d_input.text())
+        vd = float(self.vd_input.text())
+        interval = int(self.int_input.text())
+        num_doses = int(self.numd_input.text())
+
+        css = (ka * dose) / (kel * (ka - kel) * vd)
+        model_type = self.combo2.currentText()
+
+        # Define the function to calculate plasma levels
+        def plasma_levels(t):
+            plasma = np.zeros_like(t)
+            for i in range(num_doses):
+                if i == 0:
+                    ct = (dose / vd) * (ka / (ka + kel)) * (1 -
+                                                            np.exp(-(ka + kel) * t[i])) + css * np.exp(-kel * t[i])
+                else:
+                    previous_dose_time = interval * i
+                    time_since_last_dose = t - previous_dose_time
+                    if model_type == "1-compartment":
+                        ct = (dose / vd) * (ka / (ka + kel)) * ((1 - np.exp(-kel * time_since_last_dose)) / (
+                            1 - np.exp(-(ka + kel) * time_since_last_dose)))
+                        ct += css * (np.exp(-kel * time_since_last_dose) - np.exp(-(
+                            ka + kel) * time_since_last_dose) * np.exp(-kel * interval))
+                        ct += plasma * np.exp(-kel * interval)
+                    elif model_type == "2-compartment":
+                        ct = (dose / vd) * (ka / (ka + kel)) * \
+                            (1 - np.exp(-ka * time_since_last_dose))
+                        ct += css * (np.exp(-kel * time_since_last_dose) - np.exp(-(
+                            ka + kel) * time_since_last_dose) * np.exp(-kel * interval))
+                        ct += plasma * np.exp(-kel * interval)
+                plasma = np.where(t >= interval * i, ct, plasma)
+            return plasma
+
+        # Define the time range
+        self.time2 = np.linspace(0, 365, 1000)
+
+        # Calculate the plasma levels for the time ranges
+        self.plasma = plasma_levels(self.time2)
+
+    def exportcsv2(self):
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.FileMode.Directory)
+        d = {'Time': self.time2,
+             'Plasma Level': self.plasma}
+        df = pd.DataFrame(d)
+        if dlg.exec():
+            directory, _filter = dlg.getSaveFileName()
+            df.to_csv(str(directory) + '.csv' if len(str(directory)) > 4 and str(directory)
+                      [:-4] != '.csv' else '')
 
     def on_change_comp(self):
         if self.combo.currentText() == "1-compartment":
