@@ -130,10 +130,6 @@ class MainWindow(QMainWindow):
         self.hboxnumd.addWidget(num_d)
         self.hboxnumd.addWidget(self.numd_input)
 
-        self.combo3 = QComboBox()
-        self.combo3.addItems(["Linear Scale", "Log Scale"])
-        self.vbox2.addWidget(self.combo3)
-
         # Set the central widget of the Window.
         self.vbox2.addLayout(self.hboxka)
         self.vbox2.addLayout(self.hboxkel)
@@ -161,48 +157,72 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Auritec PK Modeler")
 
     def calc_2(self):
-        ka = float(self.kA_input.text())
-        kel = float(self.kel_input.text())
-        dose = float(self.d_input.text())
-        vd = float(self.vd_input.text())
-        interval = int(self.int_input.text())
-        num_doses = int(self.numd_input.text())
+        try:
+            ka = float(self.kA_input.text())
+            kel = float(self.kel_input.text())
+            dose = float(self.d_input.text())
+            vd = float(self.vd_input.text())
+            interval = int(self.int_input.text())
+            num_doses = int(self.numd_input.text())
 
-        css = (ka * dose) / (kel * (ka - kel) * vd)
-        model_type = self.combo2.currentText()
+            css = (ka * dose) / (kel * (ka - kel) * vd)
+            model_type = self.combo2.currentText()
 
-        # Define the function to calculate plasma levels
-        def plasma_levels(t):
-            plasma = np.zeros_like(t)
-            for i in range(num_doses):
-                if i == 0:
-                    ct = (dose / vd) * (ka / (ka + kel)) * (1 -
-                                                            np.exp(-(ka + kel) * t[i])) + css * np.exp(-kel * t[i])
-                else:
-                    previous_dose_time = interval * i
-                    time_since_last_dose = t - previous_dose_time
-                    if model_type == "1-compartment":
-                        ct = (dose / vd) * (ka / (ka + kel)) * ((1 - np.exp(-kel * time_since_last_dose)) / (
-                            1 - np.exp(-(ka + kel) * time_since_last_dose)))
-                        ct += css * (np.exp(-kel * time_since_last_dose) - np.exp(-(
-                            ka + kel) * time_since_last_dose) * np.exp(-kel * interval))
-                        ct += plasma * np.exp(-kel * interval)
-                    elif model_type == "2-compartment":
-                        ct = (dose / vd) * (ka / (ka + kel)) * \
-                            (1 - np.exp(-ka * time_since_last_dose))
-                        ct += css * (np.exp(-kel * time_since_last_dose) - np.exp(-(
-                            ka + kel) * time_since_last_dose) * np.exp(-kel * interval))
-                        ct += plasma * np.exp(-kel * interval)
-                plasma = np.where(t >= interval * i, ct, plasma)
-            return plasma
+            # Define the function to calculate plasma levels
+            def plasma_levels(t):
+                plasma = np.zeros_like(t)
+                for i in range(num_doses):
+                    if i == 0:
+                        ct = (dose / vd) * (ka / (ka + kel)) * (1 -
+                                                                np.exp(-(ka + kel) * t[i])) + css * np.exp(-kel * t[i])
+                    else:
+                        previous_dose_time = interval * i
+                        time_since_last_dose = t - previous_dose_time
+                        if model_type == "1-compartment":
+                            ct = (dose / vd) * (ka / (ka + kel)) * ((1 - np.exp(-kel * time_since_last_dose)) / (
+                                1 - np.exp(-(ka + kel) * time_since_last_dose)))
+                            ct += css * (np.exp(-kel * time_since_last_dose) - np.exp(-(
+                                ka + kel) * time_since_last_dose) * np.exp(-kel * interval))
+                            ct += plasma * np.exp(-kel * interval)
+                        elif model_type == "2-compartment":
+                            ct = (dose / vd) * (ka / (ka + kel)) * \
+                                (1 - np.exp(-ka * time_since_last_dose))
+                            ct += css * (np.exp(-kel * time_since_last_dose) - np.exp(-(
+                                ka + kel) * time_since_last_dose) * np.exp(-kel * interval))
+                            ct += plasma * np.exp(-kel * interval)
+                    plasma = np.where(t >= interval * i, ct, plasma)
+                return plasma
 
-        # Define the time range
-        self.time2 = np.linspace(0, 365, 1000)
+            # Define the time range
+            self.time2 = np.linspace(0, 365, 1000)
 
-        # Calculate the plasma levels for the time ranges
-        self.plasma = plasma_levels(self.time2)
+            # Calculate the plasma levels for the time ranges
+            self.plasma = plasma_levels(self.time2)
+        except:
+            self.error()
+            if hasattr(self, 'time2'):
+                self.time2 = None
+            if hasattr(self, 'plasma'):
+                self.plasma = None
+
+    def error(self):
+        dlg = QMessageBox(self)
+        dlg.setIcon(QMessageBox.Icon.Warning)
+        dlg.setWindowTitle("Error")
+        dlg.setText(
+            "Check your inputs (wrong input or mathematically impossible)")
+        _ = dlg.exec()
+
+    def nothing_to_export(self):
+        dlg = QMessageBox(self)
+        dlg.setIcon(QMessageBox.Icon.Warning)
+        dlg.setWindowTitle("Error")
+        dlg.setText("Run calculate first to generate values")
+        _ = dlg.exec()
 
     def exportcsv2(self):
+        if self.time2 is None or self.plasma is None:
+            self.nothing_to_export()
         dlg = QFileDialog()
         dlg.setFileMode(QFileDialog.FileMode.Directory)
         d = {'Time': self.time2,
@@ -226,66 +246,82 @@ class MainWindow(QMainWindow):
             self.change_beta_button.setText("Change Beta")
 
     def change_calc_beta(self):
-        if self.combo.currentText() == "2-compartment":
-            params, _ = curve_fit(two_compartment_model, self.input["time"], self.input["plasma_level"], p0=[float(
-                self.A_input.text()), float(self.alpha_input.text()), float(self.B_input.text()), float(self.beta_input.text())])
-            A, alpha, B, _ = params
-            label_text = f"A: {'%.3f'%A}, alpha: {'%.3f'%alpha}, B: {'%.3f'%B}, beta: {'%.3f'%float(self.changed_beta.text())}"
-            print(label_text)
-            self.results.setText(label_text)
+        try:
+            if self.combo.currentText() == "2-compartment":
+                params, _ = curve_fit(two_compartment_model, self.input["time"], self.input["plasma_level"], p0=[float(
+                    self.A_input.text()), float(self.alpha_input.text()), float(self.B_input.text()), float(self.beta_input.text())])
+                A, alpha, B, _ = params
+                label_text = f"A: {'%.3f'%A}, alpha: {'%.3f'%alpha}, B: {'%.3f'%B}, beta: {'%.3f'%float(self.changed_beta.text())}"
+                print(label_text)
+                self.results.setText(label_text)
 
-            self.fitted_plasma_level = two_compartment_model(
-                self.input["time"], A, alpha, B, float(self.changed_beta.text()))
+                self.fitted_plasma_level = two_compartment_model(
+                    self.input["time"], A, alpha, B, float(self.changed_beta.text()))
+                if hasattr(self, 'canvas'):
+                    self.canvas.deleteLater()
+                    self.canvas = None
+                self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
+                self.vbox.addWidget(self.canvas)
+                self.canvas.axes.cla()
+                self.canvas.axes.plot(
+                    self.input["time"], self.input["plasma_level"], marker="o", linestyle="--", label="Data")
+                self.canvas.axes.plot(
+                    self.input["time"], self.fitted_plasma_level, marker=".", linestyle="-", label="Fitted Curve")
+
+                self.canvas.axes.set_xlabel("Time")
+                self.canvas.axes.set_ylabel("Plasma Level")
+                self.canvas.axes.set_title("Two-Compartment Pharmacokinetics")
+                self.canvas.axes.legend()
+                self.canvas.axes.grid(True)
+                self.show()
+
+                self.resize(500, 700)
+            else:
+                params, _ = curve_fit(one_compartment_model, self.input["time"], self.input["plasma_level"], p0=[float(
+                    self.A_input.text()), float(self.alpha_input.text())])
+                A, _ = params
+                label_text = f"A: {'%.3f'%A}, alpha: {'%.3f'%float(self.changed_beta.text())}"
+                print(label_text)
+                self.results.setText(label_text)
+
+                self.fitted_plasma_level = one_compartment_model(
+                    self.input["time"], A, float(self.changed_beta.text()))
+                if hasattr(self, 'canvas'):
+                    self.canvas.deleteLater()
+                    self.canvas = None
+                self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
+                self.vbox.addWidget(self.canvas)
+                self.canvas.axes.cla()
+                self.canvas.axes.plot(
+                    self.input["time"], self.input["plasma_level"], marker="o", linestyle="--", label="Data")
+                self.canvas.axes.plot(
+                    self.input["time"], self.fitted_plasma_level, marker=".", linestyle="-", label="Fitted Curve")
+
+                self.canvas.axes.set_xlabel("Time")
+                self.canvas.axes.set_ylabel("Plasma Level")
+                self.canvas.axes.set_title("One-Compartment Pharmacokinetics")
+                self.canvas.axes.legend()
+                self.canvas.axes.grid(True)
+                self.show()
+
+                self.resize(500, 700)
+        except:
+            self.error()
+            self.results.clear()
             if hasattr(self, 'canvas'):
-                self.vbox.removeWidget(self.canvas)
+                self.canvas.deleteLater()
                 self.canvas = None
-            self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
-            self.vbox.addWidget(self.canvas)
-            self.canvas.axes.cla()
-            self.canvas.axes.plot(
-                self.input["time"], self.input["plasma_level"], marker="o", linestyle="--", label="Data")
-            self.canvas.axes.plot(
-                self.input["time"], self.fitted_plasma_level, marker=".", linestyle="-", label="Fitted Curve")
-
-            self.canvas.axes.set_xlabel("Time")
-            self.canvas.axes.set_ylabel("Plasma Level")
-            self.canvas.axes.set_title("Two-Compartment Pharmacokinetics")
-            self.canvas.axes.legend()
-            self.canvas.axes.grid(True)
-            self.show()
-
-            self.resize(500, 700)
-        else:
-            params, _ = curve_fit(one_compartment_model, self.input["time"], self.input["plasma_level"], p0=[float(
-                self.A_input.text()), float(self.alpha_input.text())])
-            A, _ = params
-            label_text = f"A: {'%.3f'%A}, alpha: {'%.3f'%float(self.changed_beta.text())}"
-            print(label_text)
-            self.results.setText(label_text)
-
-            self.fitted_plasma_level = one_compartment_model(
-                self.input["time"], A, float(self.changed_beta.text()))
-            if hasattr(self, 'canvas'):
-                self.vbox.removeWidget(self.canvas)
-                self.canvas = None
-            self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
-            self.vbox.addWidget(self.canvas)
-            self.canvas.axes.cla()
-            self.canvas.axes.plot(
-                self.input["time"], self.input["plasma_level"], marker="o", linestyle="--", label="Data")
-            self.canvas.axes.plot(
-                self.input["time"], self.fitted_plasma_level, marker=".", linestyle="-", label="Fitted Curve")
-
-            self.canvas.axes.set_xlabel("Time")
-            self.canvas.axes.set_ylabel("Plasma Level")
-            self.canvas.axes.set_title("One-Compartment Pharmacokinetics")
-            self.canvas.axes.legend()
-            self.canvas.axes.grid(True)
-            self.show()
-
-            self.resize(500, 700)
+            if hasattr(self, 'fitted_plasma_level'):
+                self.fitted_plasma_level = None
 
     def exportcsv(self):
+        try:
+            _ = self.input["time"]
+        except:
+            self.error()
+
+        if self.fitted_plasma_level is None:
+            self.nothing_to_export()
         dlg = QFileDialog()
         dlg.setFileMode(QFileDialog.FileMode.Directory)
         d = {'Time': self.input["time"],
@@ -303,65 +339,71 @@ class MainWindow(QMainWindow):
             self.input = pd.read_csv(filenames[0])
 
     def calc(self):
-        # TODO: validate inputs
-        if self.combo.currentText() == "2-compartment":
-            params, _ = curve_fit(two_compartment_model, self.input["time"], self.input["plasma_level"], p0=[float(
-                self.A_input.text()), float(self.alpha_input.text()), float(self.B_input.text()), float(self.beta_input.text())])
-            A, alpha, B, beta = params
-            label_text = f"A: {'%.3f'%A}, alpha: {'%.3f'%alpha}, B: {'%.3f'%B}, beta: {'%.3f'%beta}"
-            print(label_text)
-            self.results.setText(label_text)
+        try:
+            if self.combo.currentText() == "2-compartment":
+                params, _ = curve_fit(two_compartment_model, self.input["time"], self.input["plasma_level"], p0=[float(
+                    self.A_input.text()), float(self.alpha_input.text()), float(self.B_input.text()), float(self.beta_input.text())])
+                A, alpha, B, beta = params
+                label_text = f"A: {'%.3f'%A}, alpha: {'%.3f'%alpha}, B: {'%.3f'%B}, beta: {'%.3f'%beta}"
+                self.results.setText(label_text)
 
-            self.fitted_plasma_level = two_compartment_model(
-                self.input["time"], A, alpha, B, beta)
+                self.fitted_plasma_level = two_compartment_model(
+                    self.input["time"], A, alpha, B, beta)
+                if hasattr(self, 'canvas'):
+                    self.vbox.removeWidget(self.canvas)
+                    self.canvas = None
+                self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
+                self.vbox.addWidget(self.canvas)
+                self.canvas.axes.cla()
+                self.canvas.axes.plot(
+                    self.input["time"], self.input["plasma_level"], marker="o", linestyle="--", label="Data")
+                self.canvas.axes.plot(
+                    self.input["time"], self.fitted_plasma_level, marker=".", linestyle="-", label="Fitted Curve")
+
+                self.canvas.axes.set_xlabel("Time")
+                self.canvas.axes.set_ylabel("Plasma Level")
+                self.canvas.axes.set_title("Two-Compartment Pharmacokinetics")
+                self.canvas.axes.legend()
+                self.canvas.axes.grid(True)
+                self.show()
+
+                self.resize(500, 700)
+            else:
+                params, _ = curve_fit(one_compartment_model, self.input["time"], self.input["plasma_level"], p0=[float(
+                    self.A_input.text()), float(self.alpha_input.text())])
+                A, alpha = params
+                label_text = f"A: {'%.3f'%A}, alpha: {'%.3f'%alpha}"
+                self.results.setText(label_text)
+
+                self.fitted_plasma_level = one_compartment_model(
+                    self.input["time"], A, alpha)
+                if hasattr(self, 'canvas'):
+                    self.vbox.removeWidget(self.canvas)
+                    self.canvas = None
+                self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
+                self.vbox.addWidget(self.canvas)
+                self.canvas.axes.cla()
+                self.canvas.axes.plot(
+                    self.input["time"], self.input["plasma_level"], marker="o", linestyle="--", label="Data")
+                self.canvas.axes.plot(
+                    self.input["time"], self.fitted_plasma_level, marker=".", linestyle="-", label="Fitted Curve")
+
+                self.canvas.axes.set_xlabel("Time")
+                self.canvas.axes.set_ylabel("Plasma Level")
+                self.canvas.axes.set_title("One-Compartment Pharmacokinetics")
+                self.canvas.axes.legend()
+                self.canvas.axes.grid(True)
+                self.show()
+
+                self.resize(500, 700)
+        except:
+            self.error()
+            self.results.clear()
             if hasattr(self, 'canvas'):
-                self.vbox.removeWidget(self.canvas)
+                self.canvas.deleteLater()
                 self.canvas = None
-            self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
-            self.vbox.addWidget(self.canvas)
-            self.canvas.axes.cla()
-            self.canvas.axes.plot(
-                self.input["time"], self.input["plasma_level"], marker="o", linestyle="--", label="Data")
-            self.canvas.axes.plot(
-                self.input["time"], self.fitted_plasma_level, marker=".", linestyle="-", label="Fitted Curve")
-
-            self.canvas.axes.set_xlabel("Time")
-            self.canvas.axes.set_ylabel("Plasma Level")
-            self.canvas.axes.set_title("Two-Compartment Pharmacokinetics")
-            self.canvas.axes.legend()
-            self.canvas.axes.grid(True)
-            self.show()
-
-            self.resize(500, 700)
-        else:
-            params, _ = curve_fit(one_compartment_model, self.input["time"], self.input["plasma_level"], p0=[float(
-                self.A_input.text()), float(self.alpha_input.text())])
-            A, alpha = params
-            label_text = f"A: {'%.3f'%A}, alpha: {'%.3f'%alpha}"
-            print(label_text)
-            self.results.setText(label_text)
-
-            self.fitted_plasma_level = one_compartment_model(
-                self.input["time"], A, alpha)
-            if hasattr(self, 'canvas'):
-                self.vbox.removeWidget(self.canvas)
-                self.canvas = None
-            self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
-            self.vbox.addWidget(self.canvas)
-            self.canvas.axes.cla()
-            self.canvas.axes.plot(
-                self.input["time"], self.input["plasma_level"], marker="o", linestyle="--", label="Data")
-            self.canvas.axes.plot(
-                self.input["time"], self.fitted_plasma_level, marker=".", linestyle="-", label="Fitted Curve")
-
-            self.canvas.axes.set_xlabel("Time")
-            self.canvas.axes.set_ylabel("Plasma Level")
-            self.canvas.axes.set_title("One-Compartment Pharmacokinetics")
-            self.canvas.axes.legend()
-            self.canvas.axes.grid(True)
-            self.show()
-
-            self.resize(500, 700)
+            if hasattr(self, 'fitted_plasma_level'):
+                self.fitted_plasma_level = None
 
 
 app = QApplication(sys.argv)
