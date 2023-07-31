@@ -143,7 +143,7 @@ class MainWindow(QMainWindow):
         self.vbox2.addWidget(calc_button2)
 
         export_button2 = QPushButton("Export to CSV")
-        export_button.clicked.connect(self.exportcsv2)
+        export_button2.clicked.connect(self.exportcsv2)
         self.vbox2.addWidget(export_button2)
 
         widget2 = QWidget()
@@ -228,6 +228,7 @@ class MainWindow(QMainWindow):
         d = {'Time': self.time2,
              'Plasma Level': self.plasma}
         df = pd.DataFrame(d)
+        print(df)
         if dlg.exec():
             directory, _filter = dlg.getSaveFileName()
             df.to_csv(str(directory) + '.csv' if len(str(directory)) > 4 and str(directory)
@@ -396,7 +397,8 @@ class MainWindow(QMainWindow):
                 self.show()
 
                 self.resize(500, 700)
-        except:
+        except Exception as e:
+            print(e)
             self.error()
             self.results.clear()
             if hasattr(self, 'canvas'):
